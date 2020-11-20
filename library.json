@@ -1,0 +1,12 @@
+{
+    "id": "{90BFC35E-83A6-6A64-9516-CD79E4A45C3B}",
+    "author": "Ulrich Bittner",
+    "name": "Gruppenschaltung",
+    "url": "https://github.com/ubittner/Gruppenschaltung",
+    "compatibility": {
+        "version": "5.5"
+    },
+    "version": "1.00",
+    "build": 1,
+    "date": 1605848477
+}

@@ -1,0 +1,14 @@
+{
+  "id": "{B5BC525B-3BC0-B081-A5A4-7FD75254B514}",
+  "name": "Gruppenschaltung",
+  "type": 3,
+  "vendor": "Ulrich Bittner",
+  "aliases": [
+    "Gruppenschaltung"
+  ],
+  "url": "https://github.com/ubittner/Gruppenschaltung",
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "GS"
+}
