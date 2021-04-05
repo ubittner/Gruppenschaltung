@@ -1,22 +1,13 @@
 <?php
 
-/** @noinspection PhpUnused */
-
 /*
- * @module      Gruppenschaltung (20201120-0601)
- *
- * @prefix      GS
- *
- * @file        module.php
- *
  * @author      Ulrich Bittner
- * @copyright   (c) 2020
+ * @copyright   (c) 2020, 2021
  * @license    	CC BY-NC-SA 4.0
- *              https://creativecommons.org/licenses/by-nc-sa/4.0/
- *
  * @see         https://github.com/ubittner/Gruppenschaltung
- *
  */
+
+/** @noinspection PhpUnused */
 
 declare(strict_types=1);
 
@@ -24,42 +15,58 @@ include_once __DIR__ . '/helper/autoload.php';
 
 class Gruppenschaltung extends IPSModule
 {
-    //Helper
+    // Helper
     use GS_backupRestore;
     use GS_controlGroup;
 
-    //Constants
+    // Constants
     private const DELAY_MILLISECONDS = 250;
 
     public function Create()
     {
-        //Never delete this line!
+        // Never delete this line!
         parent::Create();
-        $this->RegisterProperties();
-        $this->RegisterVariables();
-        $this->RegisterAttributeBoolean('DisableUpdateMode', false);
-    }
 
-    public function Destroy()
-    {
-        //Never delete this line!
-        parent::Destroy();
+        // Properties
+        // Maintenance
+        $this->RegisterPropertyBoolean('MaintenanceMode', false);
+        // Group
+        $this->RegisterPropertyString('Variables', '[]');
+
+        // Variables
+        // Group switch
+        $this->RegisterVariableBoolean('GroupSwitch', 'Gruppenschaltung', '~Switch', 10);
+        $this->EnableAction('GroupSwitch');
+
+        // Attribute
+        $this->RegisterAttributeBoolean('DisableUpdateMode', false);
     }
 
     public function ApplyChanges()
     {
-        //Wait until IP-Symcon is started
+        // Wait until IP-Symcon is started
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
-        //Never delete this line!
+
+        // Never delete this line!
         parent::ApplyChanges();
-        //Check runlevel
+
+        // Check runlevel
         if (IPS_GetKernelRunlevel() != KR_READY) {
             return;
         }
+
         $this->RegisterMessages();
         $this->WriteAttributeBoolean('DisableUpdateMode', false);
         $this->UpdateGroup();
+
+        // Validation
         $this->ValidateConfiguration();
+    }
+
+    public function Destroy()
+    {
+        // Never delete this line!
+        parent::Destroy();
     }
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
@@ -77,15 +84,19 @@ class Gruppenschaltung extends IPSModule
                 break;
 
             case VM_UPDATE:
+
                 //$Data[0] = actual value
                 //$Data[1] = value changed
                 //$Data[2] = last value
                 //$Data[3] = timestamp actual value
                 //$Data[4] = timestamp value changed
                 //$Data[5] = timestamp last value
+
                 if ($this->CheckMaintenanceMode()) {
                     return;
                 }
+
+                // Check trigger variable
                 $variables = json_decode($this->ReadPropertyString('Variables'), true);
                 if (!empty($variables)) {
                     if (array_search($SenderID, array_column($variables, 'ID')) !== false) {
@@ -102,7 +113,8 @@ class Gruppenschaltung extends IPSModule
     {
         $formData = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
         $result = true;
-        //Variables
+
+        // Variables
         $vars = json_decode($this->ReadPropertyString('Variables'));
         if (!empty($vars)) {
             foreach ($vars as $var) {
@@ -121,14 +133,15 @@ class Gruppenschaltung extends IPSModule
                     'rowColor'      => $rowColor];
             }
         }
-        //Registered messages
+
+        // Registered messages
         $messages = $this->GetMessageList();
         foreach ($messages as $senderID => $messageID) {
             $senderName = 'Objekt #' . $senderID . ' existiert nicht';
             $rowColor = '#FFC0C0'; # red
             if (@IPS_ObjectExists($senderID)) {
                 $senderName = IPS_GetName($senderID);
-                $rowColor = '';
+                $rowColor = '#C0FFC0'; # light green
             }
             switch ($messageID) {
                 case [10001]:
@@ -149,11 +162,13 @@ class Gruppenschaltung extends IPSModule
                 'MessageDescription'                                    => $messageDescription,
                 'rowColor'                                              => $rowColor];
         }
+
         $status = $this->GetStatus();
         if (!$result && $status == 102) {
             $status = 201;
         }
         $this->SetStatus($status);
+
         return json_encode($formData);
     }
 
@@ -181,24 +196,9 @@ class Gruppenschaltung extends IPSModule
         $this->ApplyChanges();
     }
 
-    private function RegisterProperties(): void
-    {
-        //Maintenance
-        $this->RegisterPropertyBoolean('MaintenanceMode', false);
-        //Group
-        $this->RegisterPropertyString('Variables', '[]');
-    }
-
-    private function RegisterVariables(): void
-    {
-        //Group switch
-        $this->RegisterVariableBoolean('GroupSwitch', 'Gruppenschaltung', '~Switch', 10);
-        $this->EnableAction('GroupSwitch');
-    }
-
     private function RegisterMessages(): void
     {
-        //Unregister
+        // Unregister VM_UPDATE
         $registeredMessages = $this->GetMessageList();
         if (!empty($registeredMessages)) {
             foreach ($registeredMessages as $id => $registeredMessage) {
@@ -209,7 +209,8 @@ class Gruppenschaltung extends IPSModule
                 }
             }
         }
-        //Register
+
+        // Register VM_UPDATE
         $variables = json_decode($this->ReadPropertyString('Variables'));
         if (!empty($variables)) {
             foreach ($variables as $variable) {
@@ -226,12 +227,14 @@ class Gruppenschaltung extends IPSModule
     {
         $result = true;
         $status = 102;
-        //Maintenance mode
+
+        // Maintenance mode
         $maintenance = $this->CheckMaintenanceMode();
         if ($maintenance) {
             $result = false;
             $status = 104;
         }
+
         IPS_SetDisabled($this->InstanceID, $maintenance);
         $this->SetStatus($status);
         return $result;

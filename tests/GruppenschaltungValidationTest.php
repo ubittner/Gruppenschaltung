@@ -6,7 +6,7 @@ include_once __DIR__ . '/stubs/Validator.php';
 
 class GruppenschaltungValidationTest extends TestCaseSymconValidation
 {
-    public function testValidateAlarmzone(): void
+    public function testValidateGruppenschaltung(): void
     {
         $this->validateLibrary(__DIR__ . '/..');
     }

@@ -1,38 +1,16 @@
 <?php
 
 /*
- * @module      Gruppenschaltung
- *
- * @prefix      GS
- *
- * @file        GS_controlGroup.php
- *
  * @author      Ulrich Bittner
- * @copyright   (c) 2020
+ * @copyright   (c) 2020, 2021
  * @license    	CC BY-NC-SA 4.0
- *              https://creativecommons.org/licenses/by-nc-sa/4.0/
- *
  * @see         https://github.com/ubittner/Gruppenschaltung
- *
  */
 
 declare(strict_types=1);
 
 trait GS_controlGroup
 {
-    /**
-     * Toggles the group off or on.
-     *
-     * @param bool $State
-     * false    = off
-     * true     = on
-     *
-     * @return bool
-     * false    = an error occurred
-     * true     = ok
-     *
-     * @throws Exception
-     */
     public function ToggleGroup(bool $State): bool
     {
         $this->SendDebug(__FUNCTION__, 'Die Methode wird ausgeführt (' . microtime(true) . ')', 0);
@@ -55,11 +33,11 @@ trait GS_controlGroup
                     IPS_Sleep($var['SwitchingDelay']);
                     $response = @RequestAction($id, $State);
                     if (!$response) {
-                        //Retry
+                        // Retry
                         IPS_Sleep(self::DELAY_MILLISECONDS);
                         $response = @RequestAction($id, $State);
                         if (!$response) {
-                            //Last retry
+                            // Last retry
                             if (!$State) {
                                 IPS_Sleep(self::DELAY_MILLISECONDS);
                                 $response = @RequestAction($id, $State);
@@ -77,15 +55,6 @@ trait GS_controlGroup
         return $result;
     }
 
-    /**
-     * Updates the water sensor state.
-     *
-     * @return bool
-     * false    = an error occurred
-     * true     = ok
-     *
-     * @throws Exception
-     */
     public function UpdateGroup(): bool
     {
         $this->SendDebug(__FUNCTION__, 'Die Methode wird ausgeführt (' . microtime(true) . ')', 0);
