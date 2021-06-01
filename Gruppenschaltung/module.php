@@ -1,12 +1,12 @@
 <?php
-
 /*
  * @author      Ulrich Bittner
- * @copyright   (c) 2020, 2021
- * @license    	CC BY-NC-SA 4.0
- * @see         https://github.com/ubittner/Gruppenschaltung
+ * @copyright   (c) 2021
+ * @license     CC BY-NC-SA 4.0
+ * @see         https://github.com/ubittner/Gruppenschaltung/tree/main/Gruppenschaltung
  */
 
+/** @noinspection DuplicatedCode */
 /** @noinspection PhpUnused */
 
 declare(strict_types=1);
@@ -18,8 +18,11 @@ class Gruppenschaltung extends IPSModule
     // Helper
     use GS_backupRestore;
     use GS_controlGroup;
+    use GS_triggerVariable;
 
     // Constants
+    private const MODULE_NAME = 'Gruppenschaltung';
+    private const MODULE_PREFIX = 'UBGS';
     private const DELAY_MILLISECONDS = 250;
 
     public function Create()
@@ -28,13 +31,11 @@ class Gruppenschaltung extends IPSModule
         parent::Create();
 
         // Properties
-        // Maintenance
         $this->RegisterPropertyBoolean('MaintenanceMode', false);
-        // Group
         $this->RegisterPropertyString('Variables', '[]');
+        $this->RegisterPropertyString('TriggerVariables', '[]');
 
         // Variables
-        // Group switch
         $this->RegisterVariableBoolean('GroupSwitch', 'Gruppenschaltung', '~Switch', 10);
         $this->EnableAction('GroupSwitch');
 
@@ -55,12 +56,41 @@ class Gruppenschaltung extends IPSModule
             return;
         }
 
-        $this->RegisterMessages();
+        // Delete all references
+        foreach ($this->GetReferenceList() as $referenceID) {
+            $this->UnregisterReference($referenceID);
+        }
+
+        // Delete all registrations
+        foreach ($this->GetMessageList() as $senderID => $messages) {
+            foreach ($messages as $message) {
+                if ($message == VM_UPDATE) {
+                    $this->UnregisterMessage($senderID, VM_UPDATE);
+                }
+            }
+        }
+
         $this->WriteAttributeBoolean('DisableUpdateMode', false);
-        $this->UpdateGroup();
 
         // Validation
-        $this->ValidateConfiguration();
+        if ($this->ValidateConfiguration()) {
+            // Register references and update messages
+            $this->SendDebug(__FUNCTION__, 'Referenzen und Nachrichten werden registriert.', 0);
+            $propertyNames = ['Variables', 'TriggerVariables'];
+            foreach ($propertyNames as $propertyName) {
+                foreach (json_decode($this->ReadPropertyString($propertyName)) as $variable) {
+                    if ($variable->Use) {
+                        $id = $variable->ID;
+                        if ($id != 0 && @IPS_ObjectExists($id)) {
+                            $this->RegisterReference($id);
+                            $this->RegisterMessage($id, VM_UPDATE);
+                        }
+                    }
+                }
+            }
+
+            $this->UpdateGroup();
+        }
     }
 
     public function Destroy()
@@ -72,7 +102,6 @@ class Gruppenschaltung extends IPSModule
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
         $this->SendDebug('MessageSink', 'Message from SenderID ' . $SenderID . ' with Message ' . $Message . "\r\n Data: " . print_r($Data, true), 0);
-        $this->SendDebug(__FUNCTION__, 'Microtime:' . microtime(true), 0);
         if (!empty($Data)) {
             foreach ($Data as $key => $value) {
                 $this->SendDebug(__FUNCTION__, 'Data[' . $key . '] = ' . json_encode($value), 0);
@@ -96,13 +125,20 @@ class Gruppenschaltung extends IPSModule
                     return;
                 }
 
+                // Check variable
+                if (array_search($SenderID, array_column(json_decode($this->ReadPropertyString('Variables'), true), 'ID')) !== false) {
+                    $scriptText = self::MODULE_PREFIX . '_UpdateGroup(' . $this->InstanceID . ');';
+                    @IPS_RunScriptText($scriptText);
+                }
+
                 // Check trigger variable
-                $variables = json_decode($this->ReadPropertyString('Variables'), true);
-                if (!empty($variables)) {
-                    if (array_search($SenderID, array_column($variables, 'ID')) !== false) {
-                        $scriptText = 'GS_UpdateGroup(' . $this->InstanceID . ');';
-                        @IPS_RunScriptText($scriptText);
+                if (array_search($SenderID, array_column(json_decode($this->ReadPropertyString('TriggerVariables'), true), 'ID')) !== false) {
+                    $valueChanged = 'false';
+                    if ($Data[1]) {
+                        $valueChanged = 'true';
                     }
+                    $scriptText = self::MODULE_PREFIX . '_CheckTriggerVariable(' . $this->InstanceID . ', ' . $SenderID . ', ' . $valueChanged . ');';
+                    @IPS_RunScriptText($scriptText);
                 }
                 break;
 
@@ -111,70 +147,466 @@ class Gruppenschaltung extends IPSModule
 
     public function GetConfigurationForm()
     {
-        $formData = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
-        $result = true;
+        $form = [];
 
-        // Variables
-        $vars = json_decode($this->ReadPropertyString('Variables'));
-        if (!empty($vars)) {
-            foreach ($vars as $var) {
-                $rowColor = '';
-                $id = $var->ID;
-                if ($id == 0 || !@IPS_ObjectExists($id)) {
-                    if ($var->Use) {
-                        $rowColor = '#FFC0C0'; # red
-                        $result = false;
-                    }
-                }
-                $formData['elements'][1]['items'][0]['values'][] = [
-                    'Use'           => $var->Use,
-                    'ID'            => $id,
-                    'Description'   => $var->Description,
-                    'rowColor'      => $rowColor];
-            }
-        }
+        #################### Elements
 
-        // Registered messages
-        $messages = $this->GetMessageList();
-        foreach ($messages as $senderID => $messageID) {
-            $senderName = 'Objekt #' . $senderID . ' existiert nicht';
+        ########## Functions
+
+        ##### Functions panel
+
+        $form['elements'][] = [
+            'type'    => 'ExpansionPanel',
+            'caption' => 'Wartungsmodus',
+            'items'   => [
+                [
+                    'type'    => 'CheckBox',
+                    'name'    => 'MaintenanceMode',
+                    'caption' => 'Wartungsmodus'
+                ]
+            ]
+        ];
+
+        ########## Group
+
+        $variables = [];
+        foreach (json_decode($this->ReadPropertyString('Variables')) as $variable) {
             $rowColor = '#FFC0C0'; # red
-            if (@IPS_ObjectExists($senderID)) {
-                $senderName = IPS_GetName($senderID);
-                $rowColor = '#C0FFC0'; # light green
+            $id = $variable->ID;
+            if ($id != 0 && @IPS_ObjectExists($id)) {
+                $rowColor = '#DFDFDF'; # grey
+                if ($variable->Use) {
+                    $rowColor = '#C0FFC0'; # light green
+                }
             }
-            switch ($messageID) {
-                case [10001]:
-                    $messageDescription = 'IPS_KERNELSTARTED';
-                    break;
-
-                case [10603]:
-                    $messageDescription = 'VM_UPDATE';
-                    break;
-
-                default:
-                    $messageDescription = 'keine Bezeichnung';
-            }
-            $formData['actions'][1]['items'][0]['values'][] = [
-                'SenderID'                                              => $senderID,
-                'SenderName'                                            => $senderName,
-                'MessageID'                                             => $messageID,
-                'MessageDescription'                                    => $messageDescription,
-                'rowColor'                                              => $rowColor];
+            $variables[] = ['rowColor' => $rowColor];
         }
 
-        $status = $this->GetStatus();
-        if (!$result && $status == 102) {
-            $status = 201;
-        }
-        $this->SetStatus($status);
+        ##### Group panel
 
-        return json_encode($formData);
+        $form['elements'][] = [
+            'type'    => 'ExpansionPanel',
+            'caption' => 'Gruppe',
+            'items'   => [
+                [
+                    'type'     => 'List',
+                    'name'     => 'Variables',
+                    'caption'  => '',
+                    'rowCount' => 5,
+                    'add'      => true,
+                    'delete'   => true,
+                    'sort'     => [
+                        'column'    => 'ID',
+                        'direction' => 'ascending'
+                    ],
+                    'columns' => [
+                        [
+                            'name'    => 'Use',
+                            'caption' => 'Aktiviert',
+                            'width'   => '100px',
+                            'add'     => true,
+                            'edit'    => [
+                                'type' => 'CheckBox'
+                            ]
+                        ],
+                        [
+                            'name'    => 'ID',
+                            'caption' => 'Variable',
+                            'width'   => 'auto',
+                            'add'     => 0,
+                            'onClick' => self::MODULE_PREFIX . '_EnableConfigurationButton($id, $Variables["ID"], "GroupVariableConfigurationButton", 0);',
+                            'edit'    => [
+                                'type' => 'SelectVariable'
+                            ]
+                        ],
+                        [
+                            'name'    => 'Description',
+                            'caption' => 'Bezeichnung',
+                            'width'   => '350px',
+                            'add'     => '',
+                            'edit'    => [
+                                'type' => 'ValidationTextBox'
+                            ]
+                        ],
+                        [
+                            'name'    => 'SwitchingDelay',
+                            'caption' => 'Schaltverzögerung',
+                            'width'   => '180px',
+                            'add'     => 0,
+                            'edit'    => [
+                                'type'    => 'NumberSpinner',
+                                'suffix'  => ' Millisekunden',
+                                'minimum' => 0,
+                                'maximum' => 5000
+                            ]
+                        ]
+                    ],
+                    'values' => $variables,
+                ],
+                [
+                    'type'     => 'OpenObjectButton',
+                    'name'     => 'GroupVariableConfigurationButton',
+                    'caption'  => 'Bearbeiten',
+                    'enabled'  => false,
+                    'visible'  => false,
+                    'objectID' => 0
+                ]
+            ]
+        ];
+
+        ########## Trigger variables
+
+        $triggerVariables = [];
+        foreach (json_decode($this->ReadPropertyString('TriggerVariables')) as $variable) {
+            $rowColor = '#FFC0C0'; # red
+            $id = $variable->ID;
+            if ($id != 0 && @IPS_ObjectExists($id)) {
+                $rowColor = '#DFDFDF'; # grey
+                if ($variable->Use) {
+                    $rowColor = '#C0FFC0'; # light green
+                }
+            }
+            $triggerVariables[] = ['rowColor' => $rowColor];
+        }
+
+        ##### Trigger variables panel
+
+        $form['elements'][] = [
+            'type'    => 'ExpansionPanel',
+            'caption' => 'Auslöser',
+            'items'   => [
+                [
+                    'type'     => 'List',
+                    'name'     => 'TriggerVariables',
+                    'caption'  => '',
+                    'rowCount' => 10,
+                    'add'      => true,
+                    'delete'   => true,
+                    'sort'     => [
+                        'column'    => 'ID',
+                        'direction' => 'ascending'
+                    ],
+                    'columns' => [
+                        [
+                            'name'    => 'Use',
+                            'caption' => 'Aktiviert',
+                            'width'   => '100px',
+                            'add'     => true,
+                            'edit'    => [
+                                'type' => 'CheckBox'
+                            ]
+                        ],
+                        [
+                            'name'    => 'ID',
+                            'caption' => 'Auslösende Variable',
+                            'width'   => 'auto',
+                            'add'     => 0,
+                            'onClick' => self::MODULE_PREFIX . '_EnableConfigurationButton($id, $TriggerVariables["ID"], "TriggerVariableConfigurationButton", 0);',
+                            'edit'    => [
+                                'type' => 'SelectVariable'
+                            ]
+                        ],
+                        [
+                            'name'    => 'Info',
+                            'caption' => 'Info',
+                            'width'   => '160px',
+                            'add'     => '',
+                            'visible' => false,
+                            'edit'    => [
+                                'type'    => 'Button',
+                                'onClick' => self::MODULE_PREFIX . '_ShowVariableDetails($id, $ID);'
+                            ]
+                        ],
+                        [
+                            'name'    => 'TriggerType',
+                            'caption' => 'Auslöseart',
+                            'width'   => '280px',
+                            'add'     => 7,
+                            'edit'    => [
+                                'type'    => 'Select',
+                                'options' => [
+                                    [
+                                        'caption' => 'Bei Änderung',
+                                        'value'   => 0
+                                    ],
+                                    [
+                                        'caption' => 'Bei Aktualisierung',
+                                        'value'   => 1
+                                    ],
+                                    [
+                                        'caption' => 'Bei Grenzunterschreitung (einmalig)',
+                                        'value'   => 2
+                                    ],
+                                    [
+                                        'caption' => 'Bei Grenzunterschreitung (mehrmalig)',
+                                        'value'   => 3
+                                    ],
+                                    [
+                                        'caption' => 'Bei Grenzüberschreitung (einmalig)',
+                                        'value'   => 4
+                                    ],
+                                    [
+                                        'caption' => 'Bei Grenzüberschreitung (mehrmalig)',
+                                        'value'   => 5
+                                    ],
+                                    [
+                                        'caption' => 'Bei bestimmtem Wert (einmalig)',
+                                        'value'   => 6
+                                    ],
+                                    [
+                                        'caption' => 'Bei bestimmtem Wert (mehrmalig)',
+                                        'value'   => 7
+                                    ]
+                                ]
+                            ]
+                        ],
+                        [
+                            'name'    => 'TriggerValue',
+                            'caption' => 'Auslösewert',
+                            'width'   => '160px',
+                            'add'     => '',
+                            'edit'    => [
+                                'type' => 'ValidationTextBox'
+                            ]
+                        ],
+                        [
+                            'name'    => 'TriggerAction',
+                            'caption' => 'Auslöseaktion',
+                            'width'   => '200px',
+                            'add'     => 0,
+                            'edit'    => [
+                                'type'    => 'Select',
+                                'options' => [
+                                    [
+                                        'caption' => 'Gruppe ausschalten',
+                                        'value'   => 0
+                                    ],
+                                    [
+                                        'caption' => 'Gruppe einschalten',
+                                        'value'   => 1
+                                    ],
+                                    [
+                                        'caption' => 'Gruppe umschalten',
+                                        'value'   => 2
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ],
+                    'values' => $triggerVariables,
+                ],
+                [
+                    'type'     => 'OpenObjectButton',
+                    'name'     => 'TriggerVariableConfigurationButton',
+                    'caption'  => 'Bearbeiten',
+                    'enabled'  => false,
+                    'visible'  => false,
+                    'objectID' => 0
+                ]
+            ]
+        ];
+
+        #################### Actions
+
+        ##### Configuration panel
+
+        $form['actions'][] = [
+            'type'    => 'ExpansionPanel',
+            'caption' => 'Konfiguration',
+            'items'   => [
+                [
+                    'type'    => 'Button',
+                    'caption' => 'Neu einlesen',
+                    'onClick' => self::MODULE_PREFIX . '_ReloadConfiguration($id);'
+                ],
+                [
+                    'type'  => 'RowLayout',
+                    'items' => [
+                        [
+                            'type'    => 'SelectCategory',
+                            'name'    => 'BackupCategory',
+                            'caption' => 'Kategorie',
+                            'width'   => '600px'
+                        ],
+                        [
+                            'type'    => 'Label',
+                            'caption' => ' '
+                        ],
+                        [
+                            'type'    => 'Button',
+                            'caption' => 'Sichern',
+                            'onClick' => self::MODULE_PREFIX . '_CreateBackup($id, $BackupCategory);'
+                        ]
+                    ]
+                ],
+                [
+                    'type'  => 'RowLayout',
+                    'items' => [
+                        [
+                            'type'    => 'SelectScript',
+                            'name'    => 'ConfigurationScript',
+                            'caption' => 'Konfiguration',
+                            'width'   => '600px'
+                        ],
+                        [
+                            'type'    => 'Label',
+                            'caption' => ' '
+                        ],
+                        [
+                            'type'    => 'PopupButton',
+                            'caption' => 'Wiederherstellen',
+                            'popup'   => [
+                                'caption' => 'Konfiguration wirklich wiederherstellen?',
+                                'items'   => [
+                                    [
+                                        'type'    => 'Button',
+                                        'caption' => 'Wiederherstellen',
+                                        'onClick' => self::MODULE_PREFIX . '_RestoreConfiguration($id, $ConfigurationScript);'
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        ##### Test center panel
+
+        $form['actions'][] = [
+            'type'    => 'ExpansionPanel',
+            'caption' => 'Schaltfunktion',
+            'items'   => [
+                [
+                    'type' => 'TestCenter',
+                ]
+            ]
+        ];
+
+        #################### Status
+
+        $form['status'] = [
+            [
+                'code'    => 101,
+                'icon'    => 'active',
+                'caption' => self::MODULE_NAME . ' wird erstellt',
+            ],
+            [
+                'code'    => 102,
+                'icon'    => 'active',
+                'caption' => self::MODULE_NAME . ' ist aktiv (ID ' . $this->InstanceID . ')',
+            ],
+            [
+                'code'    => 103,
+                'icon'    => 'active',
+                'caption' => self::MODULE_NAME . ' wird gelöscht (ID ' . $this->InstanceID . ')',
+            ],
+            [
+                'code'    => 104,
+                'icon'    => 'inactive',
+                'caption' => self::MODULE_NAME . ' ist inaktiv (ID ' . $this->InstanceID . ')',
+            ],
+            [
+                'code'    => 200,
+                'icon'    => 'inactive',
+                'caption' => self::MODULE_NAME . ', es ist Fehler aufgetreten, weitere Informationen unter Meldungen, im Log oder Debug! (ID ' . $this->InstanceID . ')',
+            ]
+        ];
+        return json_encode($form);
     }
 
     public function ReloadConfiguration()
     {
         $this->ReloadForm();
+    }
+
+    public function ShowVariableDetails(int $VariableID): void
+    {
+        if ($VariableID == 0 || !@IPS_ObjectExists($VariableID)) {
+            return;
+        }
+        if ($VariableID != 0) {
+            // Variable
+            echo 'ID: ' . $VariableID . "\n";
+            echo 'Name: ' . IPS_GetName($VariableID) . "\n";
+            $variable = IPS_GetVariable($VariableID);
+            if (!empty($variable)) {
+                $variableType = $variable['VariableType'];
+                switch ($variableType) {
+                    case 0:
+                        $variableTypeName = 'Boolean';
+                        break;
+
+                    case 1:
+                        $variableTypeName = 'Integer';
+                        break;
+
+                    case 2:
+                        $variableTypeName = 'Float';
+                        break;
+
+                    case 3:
+                        $variableTypeName = 'String';
+                        break;
+
+                    default:
+                        $variableTypeName = 'Unbekannt';
+                }
+                echo 'Variablentyp: ' . $variableTypeName . "\n";
+            }
+            // Profile
+            $profile = @IPS_GetVariableProfile($variable['VariableProfile']);
+            if (empty($profile)) {
+                $profile = @IPS_GetVariableProfile($variable['VariableCustomProfile']);
+            }
+            if (!empty($profile)) {
+                $profileType = $variable['VariableType'];
+                switch ($profileType) {
+                    case 0:
+                        $profileTypeName = 'Boolean';
+                        break;
+
+                    case 1:
+                        $profileTypeName = 'Integer';
+                        break;
+
+                    case 2:
+                        $profileTypeName = 'Float';
+                        break;
+
+                    case 3:
+                        $profileTypeName = 'String';
+                        break;
+
+                    default:
+                        $profileTypeName = 'Unbekannt';
+                }
+                echo 'Profilname: ' . $profile['ProfileName'] . "\n";
+                echo 'Profiltyp: ' . $profileTypeName . "\n\n";
+            }
+            if (!empty($variable)) {
+                echo "\nVariable:\n";
+                print_r($variable);
+            }
+            if (!empty($profile)) {
+                echo "\nVariablenprofil:\n";
+                print_r($profile);
+            }
+        }
+    }
+
+    public function EnableConfigurationButton(int $ObjectID, string $ButtonName, int $Type): void
+    {
+        // Variable
+        $description = 'ID ' . $ObjectID . ' bearbeiten';
+        // Instance
+        if ($Type == 1) {
+            $description = 'ID ' . $ObjectID . ' konfigurieren';
+        }
+        $this->UpdateFormField($ButtonName, 'caption', $description);
+        $this->UpdateFormField($ButtonName, 'visible', true);
+        $this->UpdateFormField($ButtonName, 'enabled', true);
+        $this->UpdateFormField($ButtonName, 'objectID', $ObjectID);
     }
 
     #################### Request Action
@@ -196,45 +628,16 @@ class Gruppenschaltung extends IPSModule
         $this->ApplyChanges();
     }
 
-    private function RegisterMessages(): void
-    {
-        // Unregister VM_UPDATE
-        $registeredMessages = $this->GetMessageList();
-        if (!empty($registeredMessages)) {
-            foreach ($registeredMessages as $id => $registeredMessage) {
-                foreach ($registeredMessage as $messageType) {
-                    if ($messageType == VM_UPDATE) {
-                        $this->UnregisterMessage($id, VM_UPDATE);
-                    }
-                }
-            }
-        }
-
-        // Register VM_UPDATE
-        $variables = json_decode($this->ReadPropertyString('Variables'));
-        if (!empty($variables)) {
-            foreach ($variables as $variable) {
-                if ($variable->Use) {
-                    if ($variable->ID != 0 && IPS_ObjectExists($variable->ID)) {
-                        $this->RegisterMessage($variable->ID, VM_UPDATE);
-                    }
-                }
-            }
-        }
-    }
-
     private function ValidateConfiguration(): bool
     {
         $result = true;
         $status = 102;
-
         // Maintenance mode
         $maintenance = $this->CheckMaintenanceMode();
         if ($maintenance) {
             $result = false;
             $status = 104;
         }
-
         IPS_SetDisabled($this->InstanceID, $maintenance);
         $this->SetStatus($status);
         return $result;
