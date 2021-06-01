@@ -21,6 +21,7 @@ class Gruppenschaltung extends IPSModule
     use GS_triggerVariable;
 
     // Constants
+    private const LIBRARY_GUID = '{90BFC35E-83A6-6A64-9516-CD79E4A45C3B}';
     private const MODULE_NAME = 'Gruppenschaltung';
     private const MODULE_PREFIX = 'UBGS';
     private const DELAY_MILLISECONDS = 250;
@@ -485,6 +486,9 @@ class Gruppenschaltung extends IPSModule
 
         #################### Status
 
+        $library = IPS_GetLibrary(self::LIBRARY_GUID);
+        $version = '[Version ' . $library['Version'] . '-' . $library['Build'] . ' vom ' . date('d.m.Y', $library['Date']) . ']';
+
         $form['status'] = [
             [
                 'code'    => 101,
@@ -494,22 +498,22 @@ class Gruppenschaltung extends IPSModule
             [
                 'code'    => 102,
                 'icon'    => 'active',
-                'caption' => self::MODULE_NAME . ' ist aktiv (ID ' . $this->InstanceID . ')',
+                'caption' => self::MODULE_NAME . ' ist aktiv (ID ' . $this->InstanceID . ') ' . $version,
             ],
             [
                 'code'    => 103,
                 'icon'    => 'active',
-                'caption' => self::MODULE_NAME . ' wird gelöscht (ID ' . $this->InstanceID . ')',
+                'caption' => self::MODULE_NAME . ' wird gelöscht (ID ' . $this->InstanceID . ') ' . $version,
             ],
             [
                 'code'    => 104,
                 'icon'    => 'inactive',
-                'caption' => self::MODULE_NAME . ' ist inaktiv (ID ' . $this->InstanceID . ')',
+                'caption' => self::MODULE_NAME . ' ist inaktiv (ID ' . $this->InstanceID . ') ' . $version,
             ],
             [
                 'code'    => 200,
                 'icon'    => 'inactive',
-                'caption' => self::MODULE_NAME . ', es ist Fehler aufgetreten, weitere Informationen unter Meldungen, im Log oder Debug! (ID ' . $this->InstanceID . ')',
+                'caption' => 'Es ist Fehler aufgetreten, weitere Informationen unter Meldungen, im Log oder Debug! (ID ' . $this->InstanceID . ') ' . $version
             ]
         ];
         return json_encode($form);
