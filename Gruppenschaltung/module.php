@@ -188,7 +188,7 @@ class Gruppenschaltung extends IPSModule
                     'type'     => 'List',
                     'name'     => 'Variables',
                     'caption'  => '',
-                    'rowCount' => 5,
+                    'rowCount' => 10,
                     'add'      => true,
                     'delete'   => true,
                     'sort'     => [
