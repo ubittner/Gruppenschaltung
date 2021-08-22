@@ -217,6 +217,15 @@ class Gruppenschaltung extends IPSModule
                             ]
                         ],
                         [
+                            'name'    => 'Description',
+                            'caption' => 'Bezeichnung',
+                            'width'   => '350px',
+                            'add'     => '',
+                            'edit'    => [
+                                'type' => 'ValidationTextBox'
+                            ]
+                        ],
+                        [
                             'name'    => 'ID',
                             'caption' => 'Variable',
                             'width'   => 'auto',
@@ -224,15 +233,6 @@ class Gruppenschaltung extends IPSModule
                             'onClick' => self::MODULE_PREFIX . '_EnableConfigurationButton($id, $Variables["ID"], "GroupVariableConfigurationButton", 0);',
                             'edit'    => [
                                 'type' => 'SelectVariable'
-                            ]
-                        ],
-                        [
-                            'name'    => 'Description',
-                            'caption' => 'Bezeichnung',
-                            'width'   => '350px',
-                            'add'     => '',
-                            'edit'    => [
-                                'type' => 'ValidationTextBox'
                             ]
                         ],
                         [
