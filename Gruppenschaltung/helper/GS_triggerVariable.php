@@ -20,7 +20,7 @@ trait GS_triggerVariable
         }
         $triggerVariables = json_decode($this->ReadPropertyString('TriggerVariables'), true);
         if (!empty($triggerVariables)) {
-            // Check if variable is listed
+            //Check if variable is listed
             $keys = array_keys(array_column($triggerVariables, 'ID'), $VariableID);
             foreach ($keys as $key) {
                 if (!$triggerVariables[$key]['Use']) {

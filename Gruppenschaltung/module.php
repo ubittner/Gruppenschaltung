@@ -1,4 +1,5 @@
 <?php
+
 /*
  * @author      Ulrich Bittner
  * @copyright   (c) 2021
@@ -15,12 +16,12 @@ include_once __DIR__ . '/helper/autoload.php';
 
 class Gruppenschaltung extends IPSModule
 {
-    // Helper
+    //Helper
     use GS_backupRestore;
     use GS_controlGroup;
     use GS_triggerVariable;
 
-    // Constants
+    //Constants
     private const LIBRARY_GUID = '{90BFC35E-83A6-6A64-9516-CD79E4A45C3B}';
     private const MODULE_NAME = 'Gruppenschaltung';
     private const MODULE_PREFIX = 'UBGS';
@@ -28,41 +29,41 @@ class Gruppenschaltung extends IPSModule
 
     public function Create()
     {
-        // Never delete this line!
+        //Never delete this line!
         parent::Create();
 
-        // Properties
+        //Properties
         $this->RegisterPropertyBoolean('MaintenanceMode', false);
         $this->RegisterPropertyString('Variables', '[]');
         $this->RegisterPropertyString('TriggerVariables', '[]');
 
-        // Variables
+        //Variables
         $this->RegisterVariableBoolean('GroupSwitch', 'Gruppenschaltung', '~Switch', 10);
         $this->EnableAction('GroupSwitch');
 
-        // Attribute
+        //Attribute
         $this->RegisterAttributeBoolean('DisableUpdateMode', false);
     }
 
     public function ApplyChanges()
     {
-        // Wait until IP-Symcon is started
+        //Wait until IP-Symcon is started
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
 
-        // Never delete this line!
+        //Never delete this line!
         parent::ApplyChanges();
 
-        // Check runlevel
+        //Check runlevel
         if (IPS_GetKernelRunlevel() != KR_READY) {
             return;
         }
 
-        // Delete all references
+        //Delete all references
         foreach ($this->GetReferenceList() as $referenceID) {
             $this->UnregisterReference($referenceID);
         }
 
-        // Delete all registrations
+        //Delete all registrations
         foreach ($this->GetMessageList() as $senderID => $messages) {
             foreach ($messages as $message) {
                 if ($message == VM_UPDATE) {
@@ -73,9 +74,9 @@ class Gruppenschaltung extends IPSModule
 
         $this->WriteAttributeBoolean('DisableUpdateMode', false);
 
-        // Validation
+        //Validation
         if ($this->ValidateConfiguration()) {
-            // Register references and update messages
+            //Register references and update messages
             $this->SendDebug(__FUNCTION__, 'Referenzen und Nachrichten werden registriert.', 0);
             $propertyNames = ['Variables', 'TriggerVariables'];
             foreach ($propertyNames as $propertyName) {
@@ -92,12 +93,6 @@ class Gruppenschaltung extends IPSModule
 
             $this->UpdateGroup();
         }
-    }
-
-    public function Destroy()
-    {
-        // Never delete this line!
-        parent::Destroy();
     }
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
@@ -126,13 +121,13 @@ class Gruppenschaltung extends IPSModule
                     return;
                 }
 
-                // Check variable
+                //Check variable
                 if (array_search($SenderID, array_column(json_decode($this->ReadPropertyString('Variables'), true), 'ID')) !== false) {
                     $scriptText = self::MODULE_PREFIX . '_UpdateGroup(' . $this->InstanceID . ');';
                     @IPS_RunScriptText($scriptText);
                 }
 
-                // Check trigger variable
+                //Check trigger variable
                 if (array_search($SenderID, array_column(json_decode($this->ReadPropertyString('TriggerVariables'), true), 'ID')) !== false) {
                     $valueChanged = 'false';
                     if ($Data[1]) {
@@ -197,7 +192,7 @@ class Gruppenschaltung extends IPSModule
                     'add'      => true,
                     'delete'   => true,
                     'sort'     => [
-                        'column'    => 'ID',
+                        'column'    => 'Order',
                         'direction' => 'ascending'
                     ],
                     'columns' => [
@@ -211,9 +206,20 @@ class Gruppenschaltung extends IPSModule
                             ]
                         ],
                         [
+                            'name'    => 'Order',
+                            'caption' => 'Reihenfolge',
+                            'width'   => '130px',
+                            'add'     => 0,
+                            'edit'    => [
+                                'type'    => 'NumberSpinner',
+                                'minimum' => 0,
+                                'maximum' => 255
+                            ]
+                        ],
+                        [
                             'name'    => 'ID',
                             'caption' => 'Variable',
-                            'width'   => 'auto',
+                            'width'   => '350px',
                             'add'     => 0,
                             'onClick' => self::MODULE_PREFIX . '_EnableConfigurationButton($id, $Variables["ID"], "GroupVariableConfigurationButton", 0);',
                             'edit'    => [
@@ -529,81 +535,79 @@ class Gruppenschaltung extends IPSModule
         if ($VariableID == 0 || !@IPS_ObjectExists($VariableID)) {
             return;
         }
-        if ($VariableID != 0) {
-            // Variable
-            echo 'ID: ' . $VariableID . "\n";
-            echo 'Name: ' . IPS_GetName($VariableID) . "\n";
-            $variable = IPS_GetVariable($VariableID);
-            if (!empty($variable)) {
-                $variableType = $variable['VariableType'];
-                switch ($variableType) {
-                    case 0:
-                        $variableTypeName = 'Boolean';
-                        break;
+        //Variable
+        echo 'ID: ' . $VariableID . "\n";
+        echo 'Name: ' . IPS_GetName($VariableID) . "\n";
+        $variable = IPS_GetVariable($VariableID);
+        if (!empty($variable)) {
+            $variableType = $variable['VariableType'];
+            switch ($variableType) {
+                case 0:
+                    $variableTypeName = 'Boolean';
+                    break;
 
-                    case 1:
-                        $variableTypeName = 'Integer';
-                        break;
+                case 1:
+                    $variableTypeName = 'Integer';
+                    break;
 
-                    case 2:
-                        $variableTypeName = 'Float';
-                        break;
+                case 2:
+                    $variableTypeName = 'Float';
+                    break;
 
-                    case 3:
-                        $variableTypeName = 'String';
-                        break;
+                case 3:
+                    $variableTypeName = 'String';
+                    break;
 
-                    default:
-                        $variableTypeName = 'Unbekannt';
-                }
-                echo 'Variablentyp: ' . $variableTypeName . "\n";
+                default:
+                    $variableTypeName = 'Unbekannt';
             }
-            // Profile
-            $profile = @IPS_GetVariableProfile($variable['VariableProfile']);
-            if (empty($profile)) {
-                $profile = @IPS_GetVariableProfile($variable['VariableCustomProfile']);
-            }
-            if (!empty($profile)) {
-                $profileType = $variable['VariableType'];
-                switch ($profileType) {
-                    case 0:
-                        $profileTypeName = 'Boolean';
-                        break;
+            echo 'Variablentyp: ' . $variableTypeName . "\n";
+        }
+        //Profile
+        $profile = @IPS_GetVariableProfile($variable['VariableProfile']);
+        if (empty($profile)) {
+            $profile = @IPS_GetVariableProfile($variable['VariableCustomProfile']);
+        }
+        if (!empty($profile)) {
+            $profileType = $variable['VariableType'];
+            switch ($profileType) {
+                case 0:
+                    $profileTypeName = 'Boolean';
+                    break;
 
-                    case 1:
-                        $profileTypeName = 'Integer';
-                        break;
+                case 1:
+                    $profileTypeName = 'Integer';
+                    break;
 
-                    case 2:
-                        $profileTypeName = 'Float';
-                        break;
+                case 2:
+                    $profileTypeName = 'Float';
+                    break;
 
-                    case 3:
-                        $profileTypeName = 'String';
-                        break;
+                case 3:
+                    $profileTypeName = 'String';
+                    break;
 
-                    default:
-                        $profileTypeName = 'Unbekannt';
-                }
-                echo 'Profilname: ' . $profile['ProfileName'] . "\n";
-                echo 'Profiltyp: ' . $profileTypeName . "\n\n";
+                default:
+                    $profileTypeName = 'Unbekannt';
             }
-            if (!empty($variable)) {
-                echo "\nVariable:\n";
-                print_r($variable);
-            }
-            if (!empty($profile)) {
-                echo "\nVariablenprofil:\n";
-                print_r($profile);
-            }
+            echo 'Profilname: ' . $profile['ProfileName'] . "\n";
+            echo 'Profiltyp: ' . $profileTypeName . "\n\n";
+        }
+        if (!empty($variable)) {
+            echo "\nVariable:\n";
+            print_r($variable);
+        }
+        if (!empty($profile)) {
+            echo "\nVariablenprofil:\n";
+            print_r($profile);
         }
     }
 
     public function EnableConfigurationButton(int $ObjectID, string $ButtonName, int $Type): void
     {
-        // Variable
+        //Variable
         $description = 'ID ' . $ObjectID . ' bearbeiten';
-        // Instance
+        //Instance
         if ($Type == 1) {
             $description = 'ID ' . $ObjectID . ' konfigurieren';
         }
@@ -636,7 +640,7 @@ class Gruppenschaltung extends IPSModule
     {
         $result = true;
         $status = 102;
-        // Maintenance mode
+        //Maintenance mode
         $maintenance = $this->CheckMaintenanceMode();
         if ($maintenance) {
             $result = false;

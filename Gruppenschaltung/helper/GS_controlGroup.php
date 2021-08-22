@@ -20,7 +20,16 @@ trait GS_controlGroup
         }
         $result = true;
         $this->SetValue('GroupSwitch', $State);
-        foreach (json_decode($this->ReadPropertyString('Variables'), true) as $variable) {
+        $variables = json_decode($this->ReadPropertyString('Variables'), true);
+        $order = array_column($variables, 'Order');
+        if (count(array_unique($order)) === 1 && end($order) === 0) {
+            //Random mode
+            shuffle($variables);
+        } else {
+            //Sort to order
+            array_multisort(array_column($variables, 'Order'), SORT_ASC, $variables);
+        }
+        foreach ($variables as $variable) {
             if ($variable['Use']) {
                 $id = $variable['ID'];
                 if ($id != 0 && @IPS_ObjectExists($id)) {
@@ -28,11 +37,11 @@ trait GS_controlGroup
                     IPS_Sleep($variable['SwitchingDelay']);
                     $response = @RequestAction($id, $State);
                     if (!$response) {
-                        // Retry
+                        //Retry
                         IPS_Sleep(self::DELAY_MILLISECONDS);
                         $response = @RequestAction($id, $State);
                         if (!$response) {
-                            // Last retry
+                            //Last retry
                             if (!$State) {
                                 IPS_Sleep(self::DELAY_MILLISECONDS);
                                 $response = @RequestAction($id, $State);
