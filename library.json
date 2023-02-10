@@ -4,9 +4,9 @@
     "name": "Gruppenschaltung",
     "url": "https://github.com/ubittner/Gruppenschaltung",
     "compatibility": {
-        "version": "5.5"
+        "version": "6.1"
     },
     "version": "1.0",
-    "build": 5,
-    "date": 1629617828
+    "build": 6,
+    "date": 1676036910
 }
