@@ -120,36 +120,6 @@ trait GRPS_Config
             ]
         ];
 
-        ##### Elements: Function
-
-        $form['elements'][] = [
-            'type'    => 'ExpansionPanel',
-            'caption' => 'Funktionen',
-            'items'   => [
-                [
-                    'type'    => 'Label',
-                    'caption' => 'WebFront',
-                    'bold'    => true,
-                    'italic'  => true
-                ],
-                [
-                    'type'    => 'Label',
-                    'caption' => 'Anzeigeoptionen',
-                    'italic'  => true
-                ],
-                [
-                    'type'    => 'CheckBox',
-                    'name'    => 'EnableActive',
-                    'caption' => 'Aktiv'
-                ],
-                [
-                    'type'    => 'CheckBox',
-                    'name'    => 'EnableGroupSwitch',
-                    'caption' => 'Gruppenschaltung'
-                ]
-            ]
-        ];
-
         ##### Group
 
         $variables = [];
@@ -499,6 +469,36 @@ trait GRPS_Config
                             'objectID' => $id
                         ]
                     ]
+                ]
+            ]
+        ];
+
+        ##### Elements: Visualisation
+
+        $form['elements'][] = [
+            'type'    => 'ExpansionPanel',
+            'caption' => 'Visualisierung',
+            'items'   => [
+                [
+                    'type'    => 'Label',
+                    'caption' => 'WebFront',
+                    'bold'    => true,
+                    'italic'  => true
+                ],
+                [
+                    'type'    => 'Label',
+                    'caption' => 'Anzeigeoptionen',
+                    'italic'  => true
+                ],
+                [
+                    'type'    => 'CheckBox',
+                    'name'    => 'EnableActive',
+                    'caption' => 'Aktiv'
+                ],
+                [
+                    'type'    => 'CheckBox',
+                    'name'    => 'EnableGroupSwitch',
+                    'caption' => 'Gruppenschaltung'
                 ]
             ]
         ];
