@@ -25,6 +25,22 @@ trait GRPS_Config
     }
 
     /**
+     * Expands or collapses the expansion panels.
+     *
+     * @param bool $State
+     * false =  collapse,
+     * true =   expand
+     *
+     * @return void
+     */
+    public function ExpandExpansionPanels(bool $State): void
+    {
+        for ($i = 1; $i <= 5; $i++) {
+            $this->UpdateFormField('Panel' . $i, 'expanded', $State);
+        }
+    }
+
+    /**
      * Modifies a configuration button.
      *
      * @param string $Field
@@ -81,10 +97,35 @@ trait GRPS_Config
 
         ########## Elements
 
-        ###### Elements: Info
+        //Configuration buttons
+        $form['elements'][0] =
+            [
+                'type'  => 'RowLayout',
+                'items' => [
+                    [
+                        'type'    => 'Button',
+                        'caption' => 'Konfiguration ausklappen',
+                        'onClick' => self::MODULE_PREFIX . '_ExpandExpansionPanels($id, true);'
+                    ],
+                    [
+                        'type'    => 'Button',
+                        'caption' => 'Konfiguration einklappen',
+                        'onClick' => self::MODULE_PREFIX . '_ExpandExpansionPanels($id, false);'
+                    ],
+                    [
+                        'type'    => 'Button',
+                        'caption' => 'Konfiguration neu laden',
+                        'onClick' => self::MODULE_PREFIX . '_ReloadConfig($id);'
+                    ]
+                ]
+            ];
 
-        $form['elements'][0] = [
+        //Info
+        $library = IPS_GetLibrary(self::LIBRARY_GUID);
+        $module = IPS_GetModule(self::MODULE_GUID);
+        $form['elements'][] = [
             'type'    => 'ExpansionPanel',
+            'name'    => 'Panel1',
             'caption' => 'Info',
             'items'   => [
                 [
@@ -94,18 +135,19 @@ trait GRPS_Config
                 ],
                 [
                     'type'    => 'Label',
-                    'name'    => 'ModuleDesignation',
-                    'caption' => "Modul:\t\t" . self::MODULE_NAME
+                    'caption' => "Modul:\t\t" . $module['ModuleName']
                 ],
                 [
                     'type'    => 'Label',
-                    'name'    => 'ModulePrefix',
-                    'caption' => "Präfix:\t\t" . self::MODULE_PREFIX
+                    'caption' => "Präfix:\t\t" . $module['Prefix']
                 ],
                 [
                     'type'    => 'Label',
-                    'name'    => 'ModuleVersion',
-                    'caption' => "Version:\t\t" . self::MODULE_VERSION
+                    'caption' => "Version:\t\t" . $library['Version'] . '-' . $library['Build'] . ', ' . date('d.m.Y', $library['Date'])
+                ],
+                [
+                    'type'    => 'Label',
+                    'caption' => "Entwickler:\t" . $library['Author']
                 ],
                 [
                     'type'    => 'Label',
@@ -139,6 +181,7 @@ trait GRPS_Config
 
         $form['elements'][] = [
             'type'    => 'ExpansionPanel',
+            'name'    => 'Panel2',
             'caption' => 'Gruppe',
             'items'   => [
                 [
@@ -273,6 +316,7 @@ trait GRPS_Config
 
         $form['elements'][] = [
             'type'    => 'ExpansionPanel',
+            'name'    => 'Panel3',
             'caption' => 'Auslöser',
             'items'   => [
                 [
@@ -439,6 +483,7 @@ trait GRPS_Config
 
         $form['elements'][] = [
             'type'    => 'ExpansionPanel',
+            'name'    => 'Panel4',
             'caption' => 'Ablaufsteuerung',
             'items'   => [
                 [
@@ -477,19 +522,9 @@ trait GRPS_Config
 
         $form['elements'][] = [
             'type'    => 'ExpansionPanel',
+            'name'    => 'Panel5',
             'caption' => 'Visualisierung',
             'items'   => [
-                [
-                    'type'    => 'Label',
-                    'caption' => 'WebFront',
-                    'bold'    => true,
-                    'italic'  => true
-                ],
-                [
-                    'type'    => 'Label',
-                    'caption' => 'Anzeigeoptionen',
-                    'italic'  => true
-                ],
                 [
                     'type'    => 'CheckBox',
                     'name'    => 'EnableActive',
@@ -505,34 +540,19 @@ trait GRPS_Config
 
         ########## Actions
 
-        ##### Actions: Configuration
+        //Test center
+        $form['actions'][] =
+            [
+                'type' => 'TestCenter'
+            ];
 
-        $form['actions'][] = [
-            'type'    => 'ExpansionPanel',
-            'caption' => 'Konfiguration',
-            'items'   => [
-                [
-                    'type'    => 'Button',
-                    'caption' => 'Neu laden',
-                    'onClick' => self::MODULE_PREFIX . '_ReloadConfig($id);'
-                ]
-            ]
-        ];
+        $form['actions'][] =
+            [
+                'type'    => 'Label',
+                'caption' => ' '
+            ];
 
-        ##### Actions: Test center
-
-        $form['actions'][] = [
-            'type'    => 'ExpansionPanel',
-            'caption' => 'Schaltfunktionen',
-            'items'   => [
-                [
-                    'type' => 'TestCenter',
-                ]
-            ]
-        ];
-
-        ##### Registered references
-
+        //Registered references
         $registeredReferences = [];
         $references = $this->GetReferenceList();
         foreach ($references as $reference) {
@@ -548,48 +568,7 @@ trait GRPS_Config
                 'rowColor' => $rowColor];
         }
 
-        ##### Actions: Registered references
-
-        $form['actions'][] = [
-            'type'    => 'ExpansionPanel',
-            'caption' => 'Registrierte Referenzen',
-            'items'   => [
-                [
-                    'type'     => 'List',
-                    'name'     => 'RegisteredReferences',
-                    'rowCount' => 10,
-                    'sort'     => [
-                        'column'    => 'ObjectID',
-                        'direction' => 'ascending'
-                    ],
-                    'columns' => [
-                        [
-                            'caption' => 'ID',
-                            'name'    => 'ObjectID',
-                            'width'   => '150px',
-                            'onClick' => self::MODULE_PREFIX . '_ModifyButton($id, "RegisteredReferencesConfigurationButton", "ID " . $RegisteredReferences["ObjectID"] . " aufrufen", $RegisteredReferences["ObjectID"]);'
-                        ],
-                        [
-                            'caption' => 'Name',
-                            'name'    => 'Name',
-                            'width'   => '300px',
-                            'onClick' => self::MODULE_PREFIX . '_ModifyButton($id, "RegisteredReferencesConfigurationButton", "ID " . $RegisteredReferences["ObjectID"] . " aufrufen", $RegisteredReferences["ObjectID"]);'
-                        ]
-                    ],
-                    'values' => $registeredReferences
-                ],
-                [
-                    'type'     => 'OpenObjectButton',
-                    'name'     => 'RegisteredReferencesConfigurationButton',
-                    'caption'  => 'Aufrufen',
-                    'visible'  => false,
-                    'objectID' => 0
-                ]
-            ]
-        ];
-
-        ##### Registered messages
-
+        //Registered messages
         $registeredMessages = [];
         $messages = $this->GetMessageList();
         foreach ($messages as $id => $messageID) {
@@ -619,15 +598,51 @@ trait GRPS_Config
                 'rowColor'           => $rowColor];
         }
 
-        ##### Actions: Registered messages
-
+        //Developer area
         $form['actions'][] = [
             'type'    => 'ExpansionPanel',
-            'caption' => 'Registrierte Nachrichten',
+            'caption' => 'Entwicklerbereich',
             'items'   => [
                 [
                     'type'     => 'List',
+                    'name'     => 'RegisteredReferences',
+                    'caption'  => 'Registrierte Referenzen',
+                    'rowCount' => 10,
+                    'sort'     => [
+                        'column'    => 'ObjectID',
+                        'direction' => 'ascending'
+                    ],
+                    'columns' => [
+                        [
+                            'caption' => 'ID',
+                            'name'    => 'ObjectID',
+                            'width'   => '150px',
+                            'onClick' => self::MODULE_PREFIX . '_ModifyButton($id, "RegisteredReferencesConfigurationButton", "ID " . $RegisteredReferences["ObjectID"] . " aufrufen", $RegisteredReferences["ObjectID"]);'
+                        ],
+                        [
+                            'caption' => 'Name',
+                            'name'    => 'Name',
+                            'width'   => '300px',
+                            'onClick' => self::MODULE_PREFIX . '_ModifyButton($id, "RegisteredReferencesConfigurationButton", "ID " . $RegisteredReferences["ObjectID"] . " aufrufen", $RegisteredReferences["ObjectID"]);'
+                        ]
+                    ],
+                    'values' => $registeredReferences
+                ],
+                [
+                    'type'     => 'OpenObjectButton',
+                    'name'     => 'RegisteredReferencesConfigurationButton',
+                    'caption'  => 'Aufrufen',
+                    'visible'  => false,
+                    'objectID' => 0
+                ],
+                [
+                    'type'    => 'Label',
+                    'caption' => ' '
+                ],
+                [
+                    'type'     => 'List',
                     'name'     => 'RegisteredMessages',
+                    'caption'  => 'Registrierte Nachrichten',
                     'rowCount' => 10,
                     'sort'     => [
                         'column'    => 'ObjectID',
@@ -669,27 +684,46 @@ trait GRPS_Config
             ]
         ];
 
+        //Dummy info message
+        $form['actions'][] =
+            [
+                'type'    => 'PopupAlert',
+                'name'    => 'InfoMessage',
+                'visible' => false,
+                'popup'   => [
+                    'closeCaption' => 'OK',
+                    'items'        => [
+                        [
+                            'type'    => 'Label',
+                            'name'    => 'InfoMessageLabel',
+                            'caption' => '',
+                            'visible' => true
+                        ]
+                    ]
+                ]
+            ];
+
         ########## Status
 
         $form['status'][] = [
             'code'    => 101,
             'icon'    => 'active',
-            'caption' => self::MODULE_NAME . ' wird erstellt',
+            'caption' => $module['ModuleName'] . ' wird erstellt',
         ];
         $form['status'][] = [
             'code'    => 102,
             'icon'    => 'active',
-            'caption' => self::MODULE_NAME . ' ist aktiv',
+            'caption' => $module['ModuleName'] . ' ist aktiv',
         ];
         $form['status'][] = [
             'code'    => 103,
             'icon'    => 'active',
-            'caption' => self::MODULE_NAME . ' wird gelöscht',
+            'caption' => $module['ModuleName'] . ' wird gelöscht',
         ];
         $form['status'][] = [
             'code'    => 104,
             'icon'    => 'inactive',
-            'caption' => self::MODULE_NAME . ' ist inaktiv',
+            'caption' => $module['ModuleName'] . ' ist inaktiv',
         ];
         $form['status'][] = [
             'code'    => 200,

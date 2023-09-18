@@ -23,9 +23,9 @@ class Gruppenschaltung extends IPSModule
     use GRPS_triggerVariable;
 
     //Constants
-    private const MODULE_NAME = 'Gruppenschaltung';
+    private const LIBRARY_GUID = '{90BFC35E-83A6-6A64-9516-CD79E4A45C3B}';
+    private const MODULE_GUID = '{B5BC525B-3BC0-B081-A5A4-7FD75254B514}';
     private const MODULE_PREFIX = 'GRPS';
-    private const MODULE_VERSION = '1.0-6, 10.02.2023';
     private const ABLAUFSTEUERUNG_MODULE_GUID = '{0559B287-1052-A73E-B834-EBD9B62CB938}';
     private const ABLAUFSTEUERUNG_MODULE_PREFIX = 'AST';
     private const DELAY_MILLISECONDS = 250;
