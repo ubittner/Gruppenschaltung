@@ -239,8 +239,15 @@ class Gruppenschaltung extends IPSModule
 
     public function RequestAction($Ident, $Value)
     {
-        if ($Ident == 'GroupSwitch') {
-            $this->ToggleGroup($Value);
+        switch ($Ident) {
+            case 'Active':
+                $this->SetValue('Active', $Value);
+                break;
+
+            case 'GroupSwitch':
+                $this->ToggleGroup($Value);
+                break;
+
         }
     }
 
